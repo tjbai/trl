@@ -964,9 +964,20 @@ class GRPOTrainer(Trainer):
             with unwrap_model_for_generation(
                 self.model_wrapped, self.accelerator, gather_deepspeed3_params=self.args.ds3_gather_for_generation
             ) as unwrapped_model:
+                was_ckpt = unwrapped_model.is_gradient_checkpointing
+                if was_ckpt:
+                    unwrapped_model.gradient_checkpointing_disable()
+                    unwrapped_model.config.use_cache = True
+
                 prompt_completion_ids = unwrapped_model.generate(
-                    prompt_ids, attention_mask=prompt_mask, generation_config=self.generation_config
+                    prompt_ids,
+                    attention_mask=prompt_mask,
+                    generation_config=self.generation_config,
+                    use_cache=True # important!
                 )
+
+                if was_ckpt:
+                    unwrapped_model.gradient_checkpointing_enable()
 
             # Compute prompt length and extract completion ids
             prompt_length = prompt_ids.size(1)
